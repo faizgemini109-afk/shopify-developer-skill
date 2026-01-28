@@ -8,9 +8,9 @@ A Claude Code skill for Shopify development—themes, Hydrogen, Functions, metaf
 npx skills add cathrynlavery/shopify-developer-skill
 ```
 
-Or manually:
+**Recommended:** Also install Context7 for real-time API docs:
 ```bash
-cp -r . ~/.claude/skills/shopify-developer
+npx skills add intellectronica/agent-skills --skill context7
 ```
 
 ## What It Does

@@ -8,6 +8,18 @@ description: |
 
 Expert guidance for Shopify development across themes, headless commerce, and platform extensions.
 
+## Recommended: Install Context7 Skill
+
+For up-to-date Shopify documentation lookups, install the Context7 skill:
+
+```bash
+npx skills add intellectronica/agent-skills --skill context7
+```
+
+This enables real-time API verification to prevent outdated patterns.
+
+---
+
 ## Workflow Decision Tree
 
 ### Theme Development (Liquid)
@@ -36,15 +48,20 @@ Expert guidance for Shopify development across themes, headless commerce, and pl
 
 ## The API Drift Test
 
-**CRITICAL**: Before implementing ANY Shopify feature, verify current patterns:
+**CRITICAL**: Before implementing ANY Shopify feature, verify current patterns using Context7:
 
+```bash
+# Find Shopify Liquid library
+curl -s "https://context7.com/api/v2/libs/search?libraryName=shopify+liquid&query=metafields" | jq '.results[0].id'
+
+# Fetch current documentation
+curl -s "https://context7.com/api/v2/context?libraryId=/shopify/liquid&query=metafield+access&type=txt"
 ```
-Context7 queries to run:
-├─ Liquid syntax → resolve-library-id "Shopify Liquid" → query-docs "[your feature]"
-├─ Storefront API → resolve-library-id "Shopify Storefront API" → query-docs "[your query]"
-├─ Hydrogen → resolve-library-id "Shopify Hydrogen" → query-docs "[your component]"
-└─ Functions → resolve-library-id "Shopify Functions" → query-docs "[your function type]"
-```
+
+**Common lookups:**
+- Liquid: `libraryName=shopify+liquid`
+- Storefront API: `libraryName=shopify+storefront+api`
+- Hydrogen: `libraryName=shopify+hydrogen`
 
 **Why this matters**: Shopify APIs change frequently. Code that worked in 2024 may be deprecated in 2025.
 
