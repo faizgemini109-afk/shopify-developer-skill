@@ -1,168 +1,233 @@
-# Shopify Platform Limits & Updates
+# Shopify Platform Limits
 
 ## Table of Contents
-- [Current Limits](#current-limits)
-- [API Changes 2024-2025](#api-changes-2024-2025)
+- [What You Can / Can't Do](#what-you-can--cant-do)
+- [API Versioning](#api-versioning)
+- [Rate Limits](#rate-limits)
+- [GraphQL Cost and Headers](#graphql-cost-and-headers)
+- [Resource Limits](#resource-limits)
 - [Plan-Specific Features](#plan-specific-features)
-- [Debugging Tips](#debugging-tips)
-- [Official Resources](#official-resources)
+- [Deprecation Timeline (2025-2026)](#deprecation-timeline-2025-2026)
+- [REST to GraphQL Migration](#rest-to-graphql-migration)
+- [Operational Checklist](#operational-checklist)
+- [Gotchas](#gotchas)
 
-## Current Limits
+## What You Can / Can't Do
 
-### Products & Variants
+### You can
+- Use Admin GraphQL and Storefront GraphQL as primary APIs for new features.
+- Use bulk operations for high-volume exports/import-like mutation workflows.
+- Use checkout extensibility and Shopify Functions for modern checkout customization.
+- Use API version pinning to control rollout and test quarterly upgrades.
+
+### You can't
+- Depend on unsupported API versions after support ends.
+- Assume identical limits across plans (especially Plus vs non-Plus).
+- Keep using legacy checkout customization (`checkout.liquid`) long-term.
+- Use network or filesystem APIs in Shopify Functions runtime.
+
+## API Versioning
+
+Shopify Admin and Storefront APIs use quarterly versioning (`YYYY-MM`), for example `2026-01`.
+
+| Item | Rule |
+|---|---|
+| Release cadence | Quarterly |
+| Version format | `YYYY-MM` |
+| Support window | 12 months |
+| Upgrade cadence (recommended) | Once per quarter or at least every 2 quarters |
+
+Practical policy:
+1. Pin API version explicitly in all endpoints.
+2. Run contract tests against the next version before cutover.
+3. Remove deprecated fields proactively each quarter.
+
+Endpoint examples:
+
+```bash
+# Admin GraphQL
+https://${SHOP}.myshopify.com/admin/api/${API_VERSION}/graphql.json
+
+# Storefront GraphQL
+https://${SHOP}.myshopify.com/api/${API_VERSION}/graphql.json
+```
+
+## Rate Limits
+
+Use this file as authoritative limit guidance. Other references should link here.
+
+### Admin GraphQL (cost-based)
+
+| Plan tier | Bucket size | Restore rate |
+|---|---:|---:|
+| Standard | 1000 points | 50 points/sec |
+| Plus | 2000 points | 100 points/sec |
+
+### Admin REST (legacy/maintenance)
+
+| Plan tier | Approx steady rate |
+|---|---:|
+| Standard | 2 requests/sec |
+| Plus | 4 requests/sec |
+
+### Storefront API
+
+| API | Nominal rate guidance |
+|---|---:|
+| Storefront GraphQL | 60 requests/sec |
+
+### Bulk operations
+
+Bulk operations are the preferred path for large datasets. They reduce rate pressure and avoid paging bottlenecks.
+
+## GraphQL Cost and Headers
+
+Admin GraphQL responses expose cost data. Use it for adaptive throttling.
+
+Query pattern:
+
+```graphql
+query Products($first: Int!, $after: String) {
+  products(first: $first, after: $after) {
+    edges {
+      cursor
+      node {
+        id
+        title
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+```
+
+Response extensions to read:
+
+- `extensions.cost.requestedQueryCost`
+- `extensions.cost.actualQueryCost`
+- `extensions.cost.throttleStatus.maximumAvailable`
+- `extensions.cost.throttleStatus.currentlyAvailable`
+- `extensions.cost.throttleStatus.restoreRate`
+
+Legacy REST header you may still encounter:
+
+- `X-Shopify-Shop-Api-Call-Limit`
+
+Recommended throttling strategy:
+1. Compute a safe budget per request.
+2. Pause when `currentlyAvailable` falls below your floor.
+3. Use exponential backoff on throttle errors.
+4. Lower `first:` values when cost spikes.
+
+## Resource Limits
+
+Numbers below are commonly used operational ceilings for planning and validation.
+
+### Catalog and products
+
 | Limit | Value |
-|-------|-------|
-| Variants per product | 100 (increased from 50) |
-| Options per product | 3 |
-| Images per product | 250 |
-| Tags per product | 250 |
+|---|---:|
+| Variants per product | 100 |
+| Product options per product | 3 |
+| Product images | 250 |
 
-### Theme Limits
+### Theme and template limits
+
 | Limit | Value |
-|-------|-------|
-| Total theme size | 50MB |
-| Single file size | 2MB |
+|---|---:|
+| Theme total size | 50 MB |
+| Single file size | 2 MB |
 | Sections per template | 100 |
 | Blocks per section | 50 |
 | Settings per section | 25 |
 
-### Metafields
+### Metafields and metaobjects
+
 | Limit | Value |
-|-------|-------|
-| Metafields per resource type | 200 |
-| Metafield value size | 512KB |
+|---|---:|
+| Metafields per resource | 200 |
+| Metafield value max size | 512 KB |
 | Namespace length | 20 chars |
 | Key length | 30 chars |
+| Metafield definitions | 200 |
+| Metaobject entries per definition | 50,000 |
 
-### API Rate Limits
-| API | Limit |
-|-----|-------|
-| Storefront API | 60 requests/second |
-| Admin API (REST) | 40 requests/second |
-| Admin API (GraphQL) | 50 points/second |
-| Shopify Functions | <5ms execution |
+### Cart and checkout related
 
-### Cart & Checkout
 | Limit | Value |
-|-------|-------|
-| Line items per cart | 500 |
-| Discount codes per order | 1 |
-| Discount codes stacking | Plus only |
+|---|---:|
+| Cart line items | 500 |
+| Discount codes per order | 1 (stacking varies by setup/plan) |
 
-## API Changes 2024-2025
+### Shopify Functions runtime
 
-### Breaking Changes
-
-**August 2024**
-- `checkout.liquid` deprecated → use Checkout Extensibility
-- All stores must migrate checkout customizations
-
-**2025 API Updates**
-- `metafieldDelete` deprecated → use `metafieldsDelete`
-- Private/public metafield permissions removed
-- Metaobject webhook support for third-party apps
-- List-type metafields support multiple values
-
-### New Features
-
-**2024**
-- Shopify Functions expanded (cart transforms, validation)
-- Hydrogen 2.0 stable release
-- Oxygen hosting for all plan tiers
-- B2B features expanded to all plans
-- 100 variant limit (up from 50)
-
-**2025**
-- Enhanced semantic search (Plus)
-- Improved checkout extensibility
-- New metaobject patterns
+| Constraint | Guidance |
+|---|---|
+| Runtime budget | Keep logic under ~5ms target |
+| Memory | ~10 MB budget |
+| I/O payload | ~64 KB practical budget |
+| Network access | Not available |
+| Filesystem access | Not available |
 
 ## Plan-Specific Features
 
-### Basic / Shopify / Advanced
-- Online Store 2.0 themes
-- Storefront API access
-- Oxygen hosting
-- B2B basic features
-- Standard checkout
+| Capability | Basic/Shopify/Advanced | Plus |
+|---|---|---|
+| Online Store 2.0 themes | Yes | Yes |
+| Admin/Storefront APIs | Yes | Yes |
+| Shopify Functions (full checkout use cases) | Limited by target | Broad support |
+| Advanced checkout extensibility | Limited | Yes |
+| Launchpad and advanced B2B controls | No | Yes |
 
-### Shopify Plus Only
-- Shopify Functions
-- Semantic Search
-- Checkout customization (full)
-- Launchpad
-- Script Editor
-- Multi-store management
-- Advanced Flow workflows
-- Discount stacking
+Treat plan availability as a preflight check for any implementation.
 
-### B2B (All Plans)
-- Company accounts
-- Volume pricing
-- Net payment terms
-- Up to 10K ship-to locations per company
-- B2B checkout flows
+## Deprecation Timeline (2025-2026)
 
-## Debugging Tips
+| Date | Change | Action |
+|---|---|---|
+| August 2025 | `checkout.liquid` migration pressure increases for Plus implementations | Complete extension migration in staged rollouts |
+| August 2026 | Legacy checkout customization retirement for all stores | Remove legacy checkout custom code |
+| April 2026 | Idempotency expectations tighten for retries on write paths | Adopt idempotency keys and duplicate write guards |
+| June 2026 | Shopify Scripts sunset window | Migrate Scripts to Shopify Functions |
 
-### Performance Issues
-1. Check Liquid loops - use `limit:` and `where:` filters
-2. Avoid nested loops when possible
-3. Use Shopify's Web Performance dashboard
-4. Test with Theme Inspector Chrome extension
-5. Monitor Core Web Vitals
+Use this table as migration planning input and dependency-risk tracking.
 
-### Common Errors
+## REST to GraphQL Migration
 
-**"Theme has too many sections"**
-- Max 100 sections per template
-- Split into multiple templates or reduce sections
+Use this sequence to migrate without outages:
 
-**"Metafield not found"**
-- Check namespace/key spelling
-- Verify metafield definition exists
-- Use `.value` accessor: `{{ product.metafields.custom.key.value }}`
+1. Inventory REST endpoints currently in use.
+2. Map each endpoint to GraphQL query/mutation equivalents.
+3. Implement GraphQL in shadow mode and compare outputs.
+4. Add feature flags for cutover.
+5. Cut traffic gradually and monitor parity.
+6. Remove REST-only code and re-run regression tests.
 
-**"Rate limit exceeded"**
-- Implement exponential backoff
-- Cache API responses
-- Batch operations where possible
+Example mapping:
 
-**"Function execution timeout"**
-- Functions must complete in <5ms
-- Simplify logic, reduce iterations
-- Pre-compute values in metafields
+| REST Pattern | GraphQL Replacement |
+|---|---|
+| Product reads by page | `products(first:, after:)` cursor pagination |
+| Product update endpoints | `productUpdate` mutation |
+| Metafield endpoint CRUD | `metafieldsSet` + `metafieldsDelete` |
+| Batch export jobs | `bulkOperationRunQuery` |
 
-### Testing Checklist
-- [ ] Test on development store first
-- [ ] Create theme duplicates for major changes
-- [ ] Test across product types and variants
-- [ ] Test with various customer groups (guest, logged in, B2B)
-- [ ] Verify mobile responsiveness on actual devices
-- [ ] Check Core Web Vitals before/after
+## Operational Checklist
 
-## Official Resources
+- Pin current API version in all clients.
+- Monitor throttle and error rates by shop.
+- Keep schema contract tests on next API version.
+- Validate plan-specific capability before rollout.
+- Centralize limit constants to avoid hardcoded drift.
 
-### Documentation
-- **Liquid Reference**: https://shopify.dev/docs/api/liquid
-- **Theme Dev Guide**: https://shopify.dev/docs/themes
-- **Storefront API**: https://shopify.dev/docs/api/storefront
-- **Admin API**: https://shopify.dev/docs/api/admin-graphql
-- **Functions**: https://shopify.dev/docs/api/functions
-- **Hydrogen**: https://shopify.dev/docs/custom-storefronts/hydrogen
+## Gotchas
 
-### Updates & News
-- **Changelog**: https://changelog.shopify.com
-- **Editions**: https://www.shopify.com/editions
-- **Developer Blog**: https://shopify.engineering
-
-### Tools
-- **Shopify CLI**: `npm install -g @shopify/cli`
-- **Theme Inspector**: Chrome extension
-- **GraphiQL Explorer**: In Partner Dashboard
-- **Polaris**: https://polaris.shopify.com
-
-### Support
-- **Partner Slack**: Join via Partner Dashboard
-- **Community Forums**: https://community.shopify.com
-- **Partner Support**: Via Partner Dashboard
+1. Do not copy limits into multiple files; this file is the source of truth.
+2. Treat request and cost throttling as distinct concepts.
+3. Plus and non-Plus throughput assumptions differ materially.
+4. Bulk operations are asynchronous; design status polling.
+5. Deprecated fields may exist for one version and disappear in the next.
+6. Version mismatch in URL is a common source of unexpected missing fields.

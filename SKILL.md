@@ -1,213 +1,94 @@
 ---
 name: shopify-developer
-description: |
-  Shopify development expert for Online Store 2.0, Hydrogen headless commerce, Shopify Functions, metaobjects/metafields, B2B wholesale, and checkout extensibility. Use for: theme customization, Liquid templating, section/block development, metafield configuration, Storefront/Admin API queries, checkout UI extensions, performance optimization, and Shopify Plus features. Triggers on: "Shopify", "Liquid", "theme", "metafield", "metaobject", "Hydrogen", "checkout extension", "Shopify Functions", "B2B wholesale", "Storefront API". For BestSelf.co store work, invoke BestSelf-Shopify-Skill for store-specific context.
+description: Comprehensive Shopify development skill for theme architecture, Liquid, Admin API, Storefront API, metafields/metaobjects, checkout extensibility, Shopify Functions, webhooks, and platform limits. Use when implementing or debugging Shopify app/theme work, API integrations, checkout customizations, or data modeling. For Hydrogen/headless framework specifics, use Context7 MCP for current framework docs.
 ---
 
 # Shopify Developer
 
-Expert guidance for Shopify development across themes, headless commerce, and platform extensions.
+Use this skill as the coordination hub. Keep implementation details in `references/` files and load only the file(s) needed for the task.
 
-## Recommended: Install Context7 Skill
+## Authentication
 
-For up-to-date Shopify documentation lookups, install the Context7 skill:
+Use quarterly API versions in all endpoints, for example `2026-01`.
 
-```bash
-npx skills add intellectronica/agent-skills --skill context7
-```
-
-This enables real-time API verification to prevent outdated patterns.
-
----
-
-## Workflow Decision Tree
-
-### Theme Development (Liquid)
-→ *Consult [liquid-patterns.md](references/liquid-patterns.md) for metafields, loops, and performance.*
-
-- **New section/template**: Create section with schema, use `sections everywhere` architecture
-- **Editing existing theme**: Pull latest first, push to draft, test before live
-- **Performance issues**: Minimize loops, use `limit:`, cache expensive lookups
-
-### Headless Commerce (Hydrogen)
-→ *Consult [apis-functions.md](references/apis-functions.md) for Storefront API queries and components.*
-
-- **New storefront**: Use Hydrogen 2.0 + Oxygen hosting
-- **Custom checkout**: Use Checkout Extensibility (checkout.liquid is deprecated)
-
-### Backend Logic (Functions)
-→ *Consult [apis-functions.md](references/apis-functions.md) for Function examples.*
-
-- **Custom discounts, shipping, payments**: Shopify Functions (<5ms execution, Plus only)
-- **Workflow automation**: Shopify Flow
-
-### Store-Specific Work
-- **BestSelf.co**: Invoke `BestSelf-Shopify-Skill` for theme IDs, `42-` section patterns, CSS conventions
-
----
-
-## The API Drift Test
-
-**CRITICAL**: Before implementing ANY Shopify feature, verify current patterns using Context7:
+Admin GraphQL endpoint:
 
 ```bash
-# Find Shopify Liquid library
-curl -s "https://context7.com/api/v2/libs/search?libraryName=shopify+liquid&query=metafields" | jq '.results[0].id'
-
-# Fetch current documentation
-curl -s "https://context7.com/api/v2/context?libraryId=/shopify/liquid&query=metafield+access&type=txt"
+https://${SHOP}.myshopify.com/admin/api/${API_VERSION}/graphql.json
 ```
 
-**Common lookups:**
-- Liquid: `libraryName=shopify+liquid`
-- Storefront API: `libraryName=shopify+storefront+api`
-- Hydrogen: `libraryName=shopify+hydrogen`
-
-**Why this matters**: Shopify APIs change frequently. Code that worked in 2024 may be deprecated in 2025.
-
-| Common Drift | Old Pattern | Current Pattern |
-|--------------|-------------|-----------------|
-| Checkout customization | `checkout.liquid` | Checkout UI Extensions |
-| Delete metafield | `metafieldDelete` | `metafieldsDelete` |
-| Metafield access | `product.metafields.namespace.key` | `product.metafields.namespace.key.value` |
-
-**Also check**: https://changelog.shopify.com for breaking changes.
-
----
-
-## Liquid Development
-→ *Consult [liquid-patterns.md](references/liquid-patterns.md) for complete patterns.*
-
-### Quick Reference
-```liquid
-{% comment %} Metafield (always use .value) {% endcomment %}
-{{ product.metafields.custom.subtitle.value }}
-
-{% comment %} List metafield iteration {% endcomment %}
-{% for item in product.metafields.features.highlights.value %}
-  {{ item }}
-{% endfor %}
-
-{% comment %} Metaobject iteration {% endcomment %}
-{% for item in shop.metaobjects.testimonials.values %}
-  {{ item.title }}
-{% endfor %}
-
-{% comment %} Safe defaults {% endcomment %}
-{{ section.settings.title | default: 'Default Title' }}
-```
-
-### DO / DON'T
-
-**DO**: Use `.value` accessor for metafields
-**DO**: Use `limit:` on loops to prevent performance issues
-**DO**: Use `where:` filter instead of nested conditionals
-**DO**: Cache expensive lookups with `{% assign %}`
-
-**DON'T**: Nest loops without limits—exponential performance hit
-**DON'T**: Use `checkout.liquid`—deprecated Aug 2024
-**DON'T**: Edit `settings_data.json` manually—Theme Editor overwrites it
-**DON'T**: Forget `shopify_attributes` on blocks—breaks Theme Editor
-
----
-
-## Section Architecture
-→ *Consult [section-settings.md](references/section-settings.md) for all 20+ setting types.*
-
-### Section Schema Template
-```liquid
-{% schema %}
-{
-  "name": "Section Name",
-  "tag": "section",
-  "class": "section-class",
-  "settings": [
-    { "type": "text", "id": "title", "label": "Title", "default": "Hello" },
-    { "type": "richtext", "id": "content", "label": "Content" }
-  ],
-  "blocks": [
-    {
-      "type": "item",
-      "name": "Item",
-      "settings": [
-        { "type": "text", "id": "heading", "label": "Heading" }
-      ]
-    }
-  ],
-  "presets": [{ "name": "Section Name" }]
-}
-{% endschema %}
-```
-
-**DO**: Include `presets` for sections you want in Theme Editor
-**DO**: Use `shopify_attributes` on block containers
-**DON'T**: Exceed 25 settings per section
-**DON'T**: Exceed 50 blocks per section
-
----
-
-## APIs & Functions
-→ *Consult [apis-functions.md](references/apis-functions.md) for complete examples.*
-
-### Storefront API (GraphQL)
-For custom storefronts, cart operations, and product queries. Rate limit: 60 req/sec.
-
-### Admin API (GraphQL)
-For metafield management, product updates, order operations. Rate limit: 50 points/sec.
-
-### Shopify Functions (Plus only)
-Custom discounts, delivery, payments. Must execute in <5ms.
-
-### Checkout Extensions
-Modern checkout customization using React components.
-
----
-
-## Platform Constraints
-→ *Consult [platform-limits.md](references/platform-limits.md) for complete limits and 2024-2025 changes.*
-
-| Limit | Value |
-|-------|-------|
-| Variants per product | 100 |
-| Sections per template | 100 |
-| Metafields per resource | 200 |
-| Theme size | 50MB total, 2MB/file |
-| Storefront API | 60 req/sec |
-| Functions execution | <5ms |
-
----
-
-## Theme CLI Workflow
+Admin API headers:
 
 ```bash
-# 1. Always pull latest first
-shopify theme pull --theme <live-id>
-
-# 2. Preview locally with hot reload
-shopify theme dev --theme <draft-id>
-
-# 3. Push to draft for testing
-shopify theme push --theme <draft-id>
-
-# 4. Only push to live after approval
-shopify theme push --theme <live-id> --allow-live
-
-# Push specific files only
-shopify theme push --theme <id> --only assets/custom.css --only sections/hero.liquid
+X-Shopify-Access-Token: ${SHOPIFY_ACCESS_TOKEN}
+Content-Type: application/json
 ```
 
-**DO**: Pull before starting work—themes change outside your session
-**DO**: Push to draft first, test, then push to live
-**DON'T**: Push directly to live without testing
+Storefront GraphQL endpoint:
 
----
+```bash
+https://${SHOP}.myshopify.com/api/${API_VERSION}/graphql.json
+```
 
-## Output Checklist
+Storefront API headers:
 
-When providing Shopify solutions:
-- [ ] Verified current API patterns via Context7 or official docs
-- [ ] Complete Liquid code with proper `.value` accessors
-- [ ] Section schema with presets (if creating sections)
-- [ ] Metafield configuration requirements noted
-- [ ] Performance considerations (loop limits, caching)
-- [ ] Testing notes for edge cases (empty states, variants)
+```bash
+X-Shopify-Storefront-Access-Token: ${SHOPIFY_STOREFRONT_TOKEN}
+Content-Type: application/json
+```
+
+Source environment variables from `~/.agents/.env` before running commands.
+
+## API Conventions
+
+- Prefer GraphQL over REST for new work.
+- Include API version in the URL; update quarterly.
+- Paginate with cursors (`first/after`) rather than page numbers.
+- Handle both top-level `errors` and mutation `userErrors`.
+- Budget GraphQL query cost and throttle based on available points.
+- Use bulk operations for large export/import workloads.
+- Prefer idempotent mutation patterns for retry-safe writes.
+
+## Core Workflows
+
+Theme development pipeline:
+- Pull current theme state, iterate in local dev, push to draft first.
+- Validate theme editor behavior (sections, blocks, settings) before live publish.
+- Reference: `references/theme-architecture.md`, `references/liquid.md`.
+
+Product and metafield management:
+- Define metafield/metaobject schemas first, then write values through Admin API.
+- Access values in Liquid and Storefront API using type-safe patterns.
+- Reference: `references/admin-api.md`, `references/metafields-metaobjects.md`.
+
+Checkout customization:
+- Use Checkout UI Extensions and Shopify Functions; avoid legacy checkout patterns.
+- Separate UI concerns (extensions) from pricing/fulfillment logic (functions).
+- Reference: `references/checkout-extensibility.md`, `references/shopify-functions.md`.
+
+## Reference Files
+
+| File | When to read |
+|---|---|
+| `references/admin-api.md` | Product/order/customer/inventory GraphQL workflows; bulk operations. Grep hint: `bulkOperation`. |
+| `references/storefront-api.md` | Headless storefront queries, cart operations, customer account flows, localization. Grep hint: `cart`. |
+| `references/metafields-metaobjects.md` | Metafield types, definitions, Liquid access, metaobject CRUD. Grep hint: `metafieldsSet`. |
+| `references/liquid.md` | Liquid objects, filters, tags, render patterns, metafield rendering, performance tuning. |
+| `references/theme-architecture.md` | OS 2.0 structure, section schema, templates, app blocks, CLI deployment flow. |
+| `references/checkout-extensibility.md` | Checkout UI extensions, web pixels, migration timelines, post-purchase extensions. |
+| `references/shopify-functions.md` | Function types, WASM constraints, implementation/testing, Scripts migration path. |
+| `references/webhooks-events.md` | Webhook topics, compliance webhooks, HMAC verification, retries/idempotency. |
+| `references/platform-limits.md` | API versioning, limits, deprecation timelines, plan-specific capabilities. |
+
+## Gotchas
+
+1. Use `.value` when rendering metafields in Liquid.
+2. Use `metafieldsDelete` (plural), not singular deletion mutation names.
+3. Do not rely on `checkout.liquid`; migrate to checkout extensibility.
+4. Plan Scripts migration before June 30, 2026 sunset.
+5. Treat REST Admin API as maintenance-only for new implementation.
+6. Rotate to supported API versions before the 12-month support window ends.
+7. Implement idempotency keys for retry-safe writes before April 1, 2026 enforcement.
+8. Remove deprecated Storefront tax fields during API upgrades.
+9. Do not hand-edit `config/settings_data.json`; use Theme Editor.
+10. Keep Shopify Functions logic minimal to stay inside strict runtime limits.
